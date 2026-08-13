@@ -126,7 +126,14 @@ app.include_router(meta.router)
 
 @app.get("/api/health", tags=["sistema"])
 def health() -> dict:
-    return {"ok": True, "app": settings.app_name, "environment": settings.environment}
+    # `database` no expone credenciales: solo el motor en uso. En serverless, "sqlite"
+    # significa que falta definir DATABASE_URL y ninguna consulta va a funcionar.
+    return {
+        "ok": True,
+        "app": settings.app_name,
+        "environment": settings.environment,
+        "database": "sqlite" if settings.is_sqlite else "postgresql",
+    }
 
 
 @app.get("/api/config", tags=["sistema"])
