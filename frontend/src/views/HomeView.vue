@@ -45,7 +45,7 @@ watch(() => ui.city?.city, loadRecent)
     <section class="hero">
       <div class="container hero-inner">
         <p class="eyebrow">🐾 Patitas Conectadas</p>
-        <h1>Ayudemos a que vuelvan a casa</h1>
+        <h1>Reencuentros, rescates y nuevos comienzos</h1>
         <p class="lead">
           Publica una mascota perdida, encontrada o en adopción en menos de dos minutos.
           Sin formularios largos y sin necesidad de crear una cuenta.
