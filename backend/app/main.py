@@ -104,10 +104,14 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
     )
 
 
-# Fotos guardadas en disco durante el desarrollo (en producción se usa Vercel Blob)
+# Fotos guardadas en disco durante el desarrollo (en producción se usa Vercel Blob).
+# El disco puede ser de solo lectura (serverless): si falla, se sigue sin montar /uploads.
 if not settings.blob_token:
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
+    try:
+        settings.upload_dir.mkdir(parents=True, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
+    except OSError as exc:
+        logger.error("No se pudo preparar la carpeta de subidas (%s): %s", settings.upload_dir, exc)
 
 
 app.include_router(auth.router)
