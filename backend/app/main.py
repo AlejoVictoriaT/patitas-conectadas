@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .db import init_db
 from .models import ALLOWED_STATUSES, ARTICLE_CATEGORIES, POST_TYPES, SPECIES
-from .routers import admin, auth, geo, meta, news, posts, reports, uploads
+from .routers import admin, auth, cron, geo, meta, news, posts, reports, uploads, visits
 from .utils import SPECIES_LABELS, STATUS_LABELS, TYPE_LABELS
 
 logger = logging.getLogger("patitas")
@@ -120,7 +120,10 @@ app.include_router(uploads.router)
 app.include_router(reports.router)
 app.include_router(geo.router)
 app.include_router(news.router)
+app.include_router(news.feed_router)
 app.include_router(admin.router)
+app.include_router(visits.router)
+app.include_router(cron.router)
 app.include_router(meta.router)
 
 
