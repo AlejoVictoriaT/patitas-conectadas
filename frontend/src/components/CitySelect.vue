@@ -179,8 +179,12 @@ function clear() {
   padding: 0;
   display: grid;
   gap: 4px;
+  /* `dvh` para que el listado no quede debajo del teclado del celular, que es
+     lo que hacía imposible elegir la ciudad al escribirla. */
   max-height: 46vh;
+  max-height: 46dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .results button {

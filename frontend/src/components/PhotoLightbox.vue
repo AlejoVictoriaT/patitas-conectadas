@@ -120,7 +120,14 @@ onBeforeUnmount(() => {
 
     <!-- El clic en el hueco alrededor de la foto también cierra. -->
     <div class="stage" @click.self="cerrar" @touchstart.passive="alTocar" @touchend.passive="alSoltar">
-      <img v-if="foto" :src="foto.url" :alt="`${alt} (${actual + 1} de ${total})`" decoding="async" />
+      <!--
+        El marco existe para que la imagen tenga contra qué medir su altura.
+        Ver la nota en los estilos: sin él, `max-height: 100%` no resuelve y la
+        foto se sale por abajo.
+      -->
+      <div class="frame" @click.self="cerrar">
+        <img v-if="foto" :src="foto.url" :alt="`${alt} (${actual + 1} de ${total})`" decoding="async" />
+      </div>
     </div>
 
     <template v-if="hasMultiple">
@@ -197,20 +204,41 @@ onBeforeUnmount(() => {
 .icon-btn:hover { background: rgba(255, 255, 255, 0.24); }
 
 /*
-  El escenario ocupa todo el alto que sobra y la foto se ajusta dentro con
-  `contain`: se ve completa y tan grande como quepa, sin recortes ni zoom.
-  `min-height: 0` es lo que permite que este hijo flexible pueda encogerse;
-  sin él, una foto alta empujaría la tira de miniaturas fuera de la pantalla.
+  El escenario ocupa todo el alto que sobra. `min-height: 0` es lo que permite
+  que este hijo flexible pueda encogerse; sin él, una foto alta empujaría la
+  tira de miniaturas fuera de la pantalla.
 */
 .stage {
+  position: relative;
   flex: 1;
   min-height: 0;
-  display: grid;
-  place-items: center;
-  padding: 0 12px;
 }
 
-.stage img {
+/*
+  Aquí está la clave de que la foto se vea entera.
+
+  `max-height: 100%` solo funciona si el contenedor tiene una altura definida.
+  Si la imagen cuelga de una caja que se dimensiona según su contenido, el
+  porcentaje no resuelve contra nada, el navegador lo descarta y la foto crece
+  hasta su tamaño natural: en las verticales se acababa viendo solo la mitad de
+  arriba.
+
+  El marco se posiciona en absoluto contra `.stage`, cuya altura sí está fijada
+  por el flex. Con eso el `100%` tiene contra qué medirse.
+
+  Va aparte de la imagen, en vez de estirar la imagen con `inset: 0`, para no
+  perder el clic de cerrar: así la caja de la foto se ajusta a la foto real y
+  el hueco oscuro de alrededor sigue perteneciendo al marco.
+*/
+.frame {
+  position: absolute;
+  inset: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frame img {
   max-width: 100%;
   max-height: 100%;
   width: auto;
@@ -285,7 +313,8 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 768px) {
-  .stage { padding: 0 64px; }
+  /* Deja aire a los lados para que las flechas no queden sobre la foto. */
+  .frame { inset: 0 72px; }
   .thumb { width: 72px; height: 72px; }
 }
 </style>
