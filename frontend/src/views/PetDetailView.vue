@@ -282,7 +282,17 @@ watch(() => props.slug, load, { immediate: true })
 }
 .thumbs button:hover { opacity: 1; transform: translateY(-2px); }
 .thumbs button.is-active { border-color: var(--brand); opacity: 1; }
-.thumbs img { width: 100%; height: 100%; object-fit: cover; }
+
+/* `contain` en vez de `cover`: la miniatura muestra la foto completa encajada
+   en su cuadro, no un recorte del centro. Con `cover` una foto vertical se
+   quedaba en la franja central y no se reconocía qué mascota era. El fondo
+   rellena lo que sobra a los lados. */
+.thumbs img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--surface-2);
+}
 
 .info { display: grid; gap: 14px; align-content: start; }
 .info h1 { margin: 0; }

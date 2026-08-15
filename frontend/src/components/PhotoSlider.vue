@@ -11,6 +11,7 @@
  * difuminado de la misma imagen, para no recortar a la mascota.
  */
 import { computed, nextTick, onBeforeUnmount, onBeforeUpdate, onMounted, ref, watch } from 'vue'
+import PhotoLightbox from '@/components/PhotoLightbox.vue'
 
 const props = defineProps({
   photos: { type: Array, default: () => [] },
@@ -78,8 +79,28 @@ function alDesplazar() {
   })
 }
 
+// ------------------------------------------------------- pantalla completa
+
+const visorAbierto = ref(false)
+
+function abrirVisor(indice) {
+  irA(indice, 'auto')
+  visorAbierto.value = true
+}
+
+function cerrarVisor() {
+  visorAbierto.value = false
+}
+
+/** Al cambiar de foto dentro del visor, el carrusel de atrás la sigue: al
+ *  cerrar, queda mostrando la misma que se estaba viendo. */
+function alCambiarEnVisor(indice) {
+  irA(indice, 'auto')
+}
+
 function alTeclado(evento) {
-  if (!hasMultiple.value) return
+  // Con el visor abierto manda él: si no, una flecha movería las dos galerías.
+  if (visorAbierto.value || !hasMultiple.value) return
   if (evento.key === 'ArrowLeft') {
     evento.preventDefault()
     anterior()
@@ -141,9 +162,20 @@ defineExpose({ irA })
           :class="{ muted }"
           :loading="index === 0 ? 'eager' : 'lazy'"
           decoding="async"
+          @click="abrirVisor(index)"
         />
       </figure>
     </div>
+
+    <button
+      type="button"
+      class="expand"
+      aria-label="Ver las fotos en pantalla completa"
+      title="Ver en pantalla completa"
+      @click="abrirVisor(active)"
+    >
+      <span aria-hidden="true">⤢</span>
+    </button>
 
     <template v-if="hasMultiple">
       <button
@@ -183,6 +215,24 @@ defineExpose({ irA })
     </template>
 
     <slot name="overlay" />
+
+    <!--
+      El visor se teletransporta al <body> a propósito. Aquí dentro quedaría
+      atrapado: `.slider` recorta con `overflow: hidden`, y en el detalle la
+      galería es `position: sticky`. Cualquier ancestro con `transform` o
+      `filter` también convertiría un `position: fixed` en relativo a él y el
+      visor dejaría de cubrir la pantalla.
+    -->
+    <Teleport to="body">
+      <PhotoLightbox
+        v-if="visorAbierto"
+        :photos="photos"
+        :index="active"
+        :alt="alt"
+        @close="cerrarVisor"
+        @update:index="alCambiarEnVisor"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -231,14 +281,24 @@ defineExpose({ irA })
   transform: scale(1.15);
 }
 
+/*
+  La imagen ocupa exactamente la caja del slide y `object-fit: contain` la
+  encaja dentro sin recortarla.
+
+  Antes se usaba `max-height: 100%` con alto automático, y ahí estaba el fallo:
+  la fila de la rejilla no tenía altura definida, el porcentaje no resolvía
+  contra nada y la foto crecía hasta su tamaño natural. El `overflow: hidden`
+  del slide se comía el resto, de modo que en las verticales solo se veía la
+  mitad de arriba. Con `inset: 0` la altura pasa a ser definida y `contain`
+  puede hacer su trabajo.
+*/
 .slide img {
-  position: relative;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  /* `contain` es el punto de todo esto: la foto se ve completa, sin recortes. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  cursor: zoom-in;
 }
 
 .slide img.muted { filter: saturate(0.6); }
@@ -281,10 +341,37 @@ defineExpose({ irA })
 .nav-prev { left: 10px; }
 .nav-next { right: 10px; }
 
+/* Botón de maximizar, en la esquina opuesta al contador. */
+.expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(16, 22, 29, 0.55);
+  color: #fff;
+  font-size: 1.05rem;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition:
+    background var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+.expand:hover {
+  background: rgba(16, 22, 29, 0.8);
+  transform: scale(1.08);
+}
+
 .counter {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 4px 10px;
   border-radius: var(--radius-pill);
   background: rgba(16, 22, 29, 0.62);
