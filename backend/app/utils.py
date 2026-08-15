@@ -26,6 +26,10 @@ from .models import (
 
 _ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789"  # sin caracteres ambiguos
 
+# Largo del identificador público. Se usa también para reconocerlo al final de
+# un slug y poder rescatar enlaces antiguos.
+PUBLIC_ID_LENGTH = 8
+
 
 def slugify(value: str, max_length: int = 60) -> str:
     normalized = unicodedata.normalize("NFKD", value or "")
@@ -34,7 +38,7 @@ def slugify(value: str, max_length: int = 60) -> str:
     return ascii_text[:max_length].strip("-")
 
 
-def generate_public_id(length: int = 8) -> str:
+def generate_public_id(length: int = PUBLIC_ID_LENGTH) -> str:
     return "".join(secrets.choice(_ALPHABET) for _ in range(length))
 
 

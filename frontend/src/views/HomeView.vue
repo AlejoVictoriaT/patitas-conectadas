@@ -11,24 +11,74 @@ const posts = ref([])
 const loading = ref(true)
 const stats = ref({ ciudades: 0 })
 
+const page = ref(1)
+const pages = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 12
+
+// Ancla para volver al inicio de la rejilla al cambiar de página.
+const gridRef = ref(null)
+
 const city = computed({
   get: () => ui.city,
   set: (value) => ui.setCity(value),
 })
 
-async function loadRecent() {
+async function loadRecent(nuevaPagina = 1) {
   loading.value = true
   try {
-    posts.value = (await api.listPosts({ page_size: 8, city: ui.city?.city })).items
+    const data = await api.listPosts({
+      page: nuevaPagina,
+      page_size: PAGE_SIZE,
+      city: ui.city?.city,
+    })
+    posts.value = data.items
+    page.value = data.page
+    pages.value = data.pages
+    total.value = data.total
   } catch {
     posts.value = []
+    total.value = 0
+    pages.value = 1
   } finally {
     loading.value = false
   }
 }
 
+async function irAPagina(destino) {
+  if (destino < 1 || destino > pages.value || destino === page.value) return
+  await loadRecent(destino)
+  // Se sube hasta la primera tarjeta, no al inicio de la portada: quien pasa de
+  // página quiere seguir viendo mascotas, no releer el encabezado.
+  const y = gridRef.value?.getBoundingClientRect().top ?? 0
+  window.scrollTo({ top: window.scrollY + y - 90, behavior: 'smooth' })
+}
+
+/** Números de página a mostrar: siempre primera y última, y una ventana
+ *  alrededor de la actual. Con muchas páginas, los saltos se marcan con «…». */
+const paginasVisibles = computed(() => {
+  const ultima = pages.value
+  if (ultima <= 7) return Array.from({ length: ultima }, (_, i) => i + 1)
+
+  const actual = page.value
+  const cerca = new Set([1, ultima, actual, actual - 1, actual + 1])
+  if (actual <= 3) [2, 3, 4].forEach((n) => cerca.add(n))
+  if (actual >= ultima - 2) [ultima - 3, ultima - 2, ultima - 1].forEach((n) => cerca.add(n))
+
+  const numeros = [...cerca].filter((n) => n >= 1 && n <= ultima).sort((a, b) => a - b)
+
+  const salida = []
+  let previo = 0
+  for (const n of numeros) {
+    if (previo && n - previo > 1) salida.push('…')
+    salida.push(n)
+    previo = n
+  }
+  return salida
+})
+
 onMounted(async () => {
-  await loadRecent()
+  await loadRecent(1)
   try {
     stats.value.ciudades = (await api.postsCities()).length
   } catch {
@@ -36,7 +86,9 @@ onMounted(async () => {
   }
 })
 
-watch(() => ui.city?.city, loadRecent)
+// Al cambiar de ciudad se vuelve a la primera página: quedarse en la 5 mostraría
+// un hueco vacío si esa ciudad tiene menos publicaciones.
+watch(() => ui.city?.city, () => loadRecent(1))
 </script>
 
 <template>
@@ -115,21 +167,65 @@ watch(() => ui.city?.city, loadRecent)
 
         <div class="section-head">
           <h2>🐾 Mascotas recientes</h2>
-          <router-link class="btn btn-quiet btn-sm" to="/buscar">Ver todas →</router-link>
+          <router-link class="btn btn-quiet btn-sm" to="/buscar">Buscar con filtros →</router-link>
         </div>
 
         <div v-if="loading" class="pet-grid">
-          <div v-for="n in 4" :key="n" class="skeleton card-skeleton"></div>
+          <div v-for="n in 8" :key="n" class="skeleton card-skeleton"></div>
         </div>
 
-        <div v-else-if="posts.length" class="pet-grid stagger">
-          <PetCard
-            v-for="(post, index) in posts"
-            :key="post.id"
-            :post="post"
-            :style="{ '--i': index }"
-          />
-        </div>
+        <template v-else-if="posts.length">
+          <p class="text-soft count">
+            {{ total }} {{ total === 1 ? 'publicación' : 'publicaciones' }}
+            <template v-if="pages > 1"> · página {{ page }} de {{ pages }}</template>
+          </p>
+
+          <div ref="gridRef" class="pet-grid stagger">
+            <PetCard
+              v-for="(post, index) in posts"
+              :key="post.id"
+              :post="post"
+              :style="{ '--i': index }"
+            />
+          </div>
+
+          <nav v-if="pages > 1" class="pager" aria-label="Páginas de publicaciones">
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              :disabled="page <= 1"
+              @click="irAPagina(page - 1)"
+            >
+              ← Anterior
+            </button>
+
+            <div class="pages">
+              <template v-for="(n, i) in paginasVisibles" :key="`${n}-${i}`">
+                <span v-if="n === '…'" class="gap" aria-hidden="true">…</span>
+                <button
+                  v-else
+                  type="button"
+                  class="page-btn"
+                  :class="{ 'is-current': n === page }"
+                  :aria-current="n === page ? 'page' : undefined"
+                  :aria-label="`Ir a la página ${n}`"
+                  @click="irAPagina(n)"
+                >
+                  {{ n }}
+                </button>
+              </template>
+            </div>
+
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              :disabled="page >= pages"
+              @click="irAPagina(page + 1)"
+            >
+              Siguiente →
+            </button>
+          </nav>
+        </template>
 
         <EmptyState
           v-else
@@ -292,6 +388,48 @@ watch(() => ui.city?.city, loadRecent)
 .city-bar p { margin: 0; }
 
 .card-skeleton { height: 300px; }
+
+.count { margin: 0 0 12px; }
+
+/* --------------------------------------------------------------- paginador */
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.pages { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+
+.page-btn {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+.page-btn:hover { background: var(--surface-2); color: var(--text); }
+
+.page-btn.is-current {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-contrast);
+}
+
+.gap { padding: 0 2px; color: var(--text-muted); }
 
 .help-grid { display: grid; gap: 14px; }
 .help-grid h3 { margin-top: 0; }

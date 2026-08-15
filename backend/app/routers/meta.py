@@ -13,14 +13,14 @@ from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..db import get_db
 from ..models import RESOLVED_STATUSES, Post
 from ..serializers import post_url
-from ..utils import pet_gender, post_title, species_label, status_label, type_label
+from ..utils import PUBLIC_ID_LENGTH, pet_gender, post_title, species_label, status_label, type_label
 
 router = APIRouter(tags=["metadatos"])
 
@@ -75,7 +75,17 @@ def _render_share_page(*, title: str, description: str, image: str | None, url: 
 
 @router.get("/mascotas/{post_type}/{slug}", include_in_schema=False)
 def share_preview(post_type: str, slug: str, db: Session = Depends(get_db)) -> HTMLResponse:
-    post = db.scalar(select(Post).options(selectinload(Post.photos)).where(Post.slug == slug))
+    # Igual que en el detalle: si el slug no coincide, se prueba con el código
+    # que lleva al final, para que un enlace antiguo siga mostrando su vista
+    # previa en vez de la genérica del sitio.
+    condiciones = [Post.slug == slug]
+    cola = slug.rsplit("-", 1)[-1]
+    if len(cola) == PUBLIC_ID_LENGTH:
+        condiciones.append(Post.public_id == cola)
+
+    post = db.scalar(
+        select(Post).options(selectinload(Post.photos)).where(or_(*condiciones))
+    )
 
     if not post or not post.is_active:
         return _render_share_page(

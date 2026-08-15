@@ -49,7 +49,16 @@ from ..security import (
 )
 from ..serializers import post_to_card, post_to_detail, post_url
 from ..storage import delete_image
-from ..utils import client_ip, generate_public_id, normalize_phone, rate_limit_ok, slugify, species_label, verify_captcha
+from ..utils import (
+    PUBLIC_ID_LENGTH,
+    client_ip,
+    generate_public_id,
+    normalize_phone,
+    rate_limit_ok,
+    slugify,
+    species_label,
+    verify_captcha,
+)
 
 router = APIRouter(prefix="/api", tags=["publicaciones"])
 
@@ -59,10 +68,34 @@ MAX_PAGE_SIZE = 48
 # --------------------------------------------------------------------- helpers
 
 
+def _public_id_del_slug(identifier: str) -> str | None:
+    """Extrae el código que va al final de un slug: «nela-2vs5ri56» → «2vs5ri56».
+
+    Los slugs se arman como `{nombre}-{public_id}`, y el `public_id` tiene un
+    largo fijo. Sirve para rescatar enlaces antiguos cuyo slug ya no coincide.
+    """
+    cola = identifier.rsplit("-", 1)[-1]
+    return cola if len(cola) == PUBLIC_ID_LENGTH else None
+
+
 def _load_post(db: Session, identifier: str) -> Post:
-    """Busca por slug, public_id o id."""
-    query = select(Post).options(selectinload(Post.photos), selectinload(Post.owner)).where(
-        or_(Post.slug == identifier, Post.public_id == identifier, Post.id == identifier)
+    """Busca por slug, public_id o id.
+
+    Como red de seguridad también prueba con el código que va al final del
+    slug. Un enlace compartido hace meses debe seguir abriendo la publicación
+    aunque su slug haya cambiado por el camino: quien lo recibió por WhatsApp no
+    tiene forma de conseguir la dirección nueva.
+    """
+    condiciones = [Post.slug == identifier, Post.public_id == identifier, Post.id == identifier]
+
+    codigo = _public_id_del_slug(identifier)
+    if codigo:
+        condiciones.append(Post.public_id == codigo)
+
+    query = (
+        select(Post)
+        .options(selectinload(Post.photos), selectinload(Post.owner))
+        .where(or_(*condiciones))
     )
     post = db.scalar(query)
     if not post:
@@ -391,8 +424,18 @@ def update_post(
             value = value.strip() or None
         setattr(post, field, value)
 
-    if "pet_name" in data:
-        post.slug = _build_slug(db, post.pet_name, post.species, post.type, post.public_id)
+    # El slug NO se regenera al editar, a propósito.
+    #
+    # Antes se rehacía cada vez que el formulario enviaba `pet_name`, es decir
+    # en toda edición, y además el chequeo de colisión encontraba el slug del
+    # propio post y le colgaba un sufijo aleatorio. El efecto era que editar una
+    # publicación rompía todos los enlaces ya compartidos: los de WhatsApp, los
+    # del grupo de Telegram y los que tuviera indexados Google.
+    #
+    # En una plataforma cuyo valor está en que el enlace circule, la URL es un
+    # identificador permanente, no un reflejo del nombre. Si la mascota se
+    # llamaba «sin nombre» y luego aparece que se llama Nela, el título de la
+    # página cambia; la dirección se queda como estaba.
 
     db.commit()
     db.refresh(post)
