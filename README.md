@@ -150,6 +150,22 @@ El navegador redimensiona a 1600 px y comprime a JPEG antes de subir. La primera
 
 Cualquier visitante puede reportar. A los **3 reportes** la publicación se oculta automáticamente y queda pendiente de revisión en el panel. Además hay honeypot invisible, límite de publicaciones por IP y captcha opcional.
 
+### Noticias
+
+Un cron diario lee feeds RSS (`backend/app/news_feed.py`) y guarda **solo titular, resumen corto y enlace**: el cuerpo de la nota es del medio que la escribió. Cada nota se clasifica en adopción, albergues, salud, comportamiento o buenas historias, y la primera página alterna temas para que no se vea un muro de lo mismo.
+
+Las fuentes son de dos clases. Unas son feeds de medios; las otras son **consultas temáticas a Google Noticias acotadas a Colombia**, y son las que sostienen la sección. La razón: los medios colombianos casi no tienen sección de mascotas, pero publican muchísimo sobre jornadas de esterilización, vacunación antirrábica y adopción — en la sección de ciudad, en la de salud, o directamente desde una alcaldía. Buscar por tema en toda la prensa las encuentra; suscribirse a secciones de mascotas, no.
+
+De esas consultas solo entra lo colombiano, decidido por el dominio del medio (`.co` cubre todas las alcaldías; los medios que se llaman `.com` están listados en `DOMINIOS_COLOMBIANOS`).
+
+**Refuerzo por tema.** La prensa colombiana casi no publica etología ni comportamiento animal, así que ese tema se quedaba en cinco notas. Para eso hay fuentes extranjeras, con dos condiciones: solo entran por los temas de `TEMAS_ATEMPORALES` —comportamiento y salud, lo que vale igual aquí que en Madrid y hoy que en tres meses— y nunca por adopción, albergues o historias, que son información de la ciudad de uno. Además se descarta su actualidad municipal (`PALABRAS_ACTUALIDAD_AJENA`): el consejo sirve, el pleno del ayuntamiento de Tacoronte no.
+
+Y solo se **muestran** cuando hacen falta: `temas_reforzados` cuenta las notas colombianas de cada tema, y las de fuera aparecen únicamente en los que no llegan a `MINIMO_LOCAL_POR_TEMA`. Dentro de un tema reforzado, lo colombiano va primero. El día que un medio local empiece a publicar comportamiento, las de fuera desaparecen solas sin tocar nada.
+
+El `external_id` es el titular normalizado y no el `guid` del feed, porque el del agregador no es estable: la misma nota encontrada por dos consultas llega con dos identificadores distintos y salía duplicada.
+
+El filtro descarta a propósito dos cosas: lo angustiante (maltrato, muerte, envenenamientos) y lo relacionado con la emergencia, que tiene su propia sección. Esta pantalla la abre alguien que acaba de publicar que perdió a su perro; el criterio es no confirmarle su peor miedo. Las listas de palabras están al inicio del módulo y cambiarlas cambia el tono de la sección.
+
 ### Estados
 
 | Tipo | Estado inicial | Estados siguientes |
@@ -182,7 +198,8 @@ Documentación interactiva en `/api/docs`. Resumen:
 | `POST` | `/api/uploads` | Subir una foto |
 | `POST` | `/api/posts/{id}/report` | Reportar |
 | `GET` | `/api/geo/search?q=` | Buscador de ciudades |
-| `GET` | `/api/articles` | Noticias y recursos |
+| `GET` | `/api/articles` | Guías y recursos propios |
+| `GET` | `/api/news` · `/topics` · `/regions` | Noticias de medios sobre perros y gatos |
 | `*` | `/api/admin/*` | Panel administrativo |
 
 ---

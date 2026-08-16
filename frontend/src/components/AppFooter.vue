@@ -50,7 +50,7 @@ const REDES = [
       <nav v-if="MOSTRAR_ENLACES" aria-label="Enlaces del pie">
         <router-link to="/buscar">Buscar mascotas</router-link>
         <router-link to="/publicar">Publicar</router-link>
-        <router-link to="/noticias">Noticias y ayuda</router-link>
+        <router-link to="/noticias">Noticias</router-link>
         <router-link to="/legal/privacidad">Política de privacidad</router-link>
         <router-link to="/legal/terminos">Términos y condiciones</router-link>
       </nav>

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import news_feed
 from ..db import get_db
-from ..models import ARTICLE_CATEGORIES, NEWS_TONE_LABELS, NEWS_TONES, Article
+from ..models import ARTICLE_CATEGORIES, NEWS_TOPIC_LABELS, NEWS_TOPICS, Article
 from ..schemas import ArticleOut, NewsListOut
 from ..utils import category_label
 
@@ -19,35 +19,23 @@ router = APIRouter(prefix="/api/articles", tags=["noticias"])
 feed_router = APIRouter(prefix="/api/news", tags=["actualidad"])
 
 
-@feed_router.get("/tones")
-def news_tones() -> list[dict]:
-    return [{"value": t, "label": NEWS_TONE_LABELS[t]} for t in NEWS_TONES]
-
-
-@feed_router.get("/regions")
-def news_regions() -> list[dict]:
-    """Solo los departamentos afectados: filtrar por otros no daría resultados."""
-    return [
-        {"value": nombre, "label": nombre, "capital": municipios[1]}
-        for nombre, municipios in news_feed.DEPARTAMENTOS.items()
-    ]
+@feed_router.get("/topics")
+def news_topics() -> list[dict]:
+    return [{"value": t, "label": NEWS_TOPIC_LABELS[t]} for t in NEWS_TOPICS]
 
 
 @feed_router.get("", response_model=NewsListOut)
 def news_feed_list(
     db: Session = Depends(get_db),
-    tone: str | None = None,
-    region: str | None = None,
-    only_pets: bool = False,
+    topic: str | None = None,
+    only_local: bool = False,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=12, ge=1, le=24),
 ):
-    if tone and tone not in NEWS_TONES:
-        raise HTTPException(status_code=400, detail="Tono no válido.")
-    if region and region not in news_feed.DEPARTAMENTOS:
-        raise HTTPException(status_code=400, detail="Departamento no válido.")
+    if topic and topic not in NEWS_TOPICS:
+        raise HTTPException(status_code=400, detail="Tema no válido.")
     return news_feed.listar(
-        db, tone=tone, region=region, only_pets=only_pets, page=page, page_size=page_size
+        db, topic=topic, only_local=only_local, page=page, page_size=page_size
     )
 
 

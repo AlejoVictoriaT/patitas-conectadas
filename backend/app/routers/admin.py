@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from .. import news_feed
 from ..db import get_db
 from ..models import (
-    NEWS_TONE_LABELS,
+    NEWS_TOPIC_LABELS,
     RESOLVED_STATUSES,
     TYPE_ADOPTION,
     TYPE_FOUND,
@@ -300,11 +300,11 @@ def admin_list_news(db: Session = Depends(get_db), limit: int = Query(default=40
             "id": n.id,
             "title": n.title,
             "source": n.source,
-            "tone": n.tone,
-            "tone_label": NEWS_TONE_LABELS.get(n.tone, n.tone),
+            "topic": n.topic,
+            "topic_label": NEWS_TOPIC_LABELS.get(n.topic, n.topic),
             "url": n.url,
             "cities": n.cities,
-            "is_pet_related": n.is_pet_related,
+            "is_local": n.is_local,
             "is_published": n.is_published,
             "published_at": n.published_at,
         }

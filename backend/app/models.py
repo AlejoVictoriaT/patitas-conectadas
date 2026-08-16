@@ -249,7 +249,7 @@ class Article(Base):
 
 
 class NewsItem(Base):
-    """Noticia de un medio externo, traída automáticamente por RSS.
+    """Nota de un medio externo sobre perros, gatos y animales de compañía.
 
     Se guarda deliberadamente en su propia tabla y no en `Article`: los
     artículos son contenido propio y curado, y esto es material de terceros
@@ -257,6 +257,14 @@ class NewsItem(Base):
     Mezclarlos obligaría además a migrar la tabla existente en producción.
 
     Nunca se almacena el texto completo de la nota: eso le pertenece al medio.
+
+    Sobre los dos nombres de columna que no coinciden con su atributo:
+    `topic` vive en la columna `tone` y `is_local` en `is_pet_related`. Ambas
+    nacieron para el feed de la emergencia —tono de la nota y si hablaba de
+    animales— y hoy guardan otra cosa. El proyecto todavía no tiene Alembic, así
+    que renombrarlas de verdad significaría perder las filas en producción; el
+    mapeo explícito deja el código honesto sin tocar la base. Cuando entren las
+    migraciones, esto se renombra y este párrafo sobra.
     """
 
     __tablename__ = "news_items"
@@ -269,23 +277,34 @@ class NewsItem(Base):
     url: Mapped[str] = mapped_column(String(600), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(600), nullable=True)
     source: Mapped[str] = mapped_column(String(80), nullable=False)
-    # tragedia | esperanza | ayuda — permite equilibrar lo que se muestra.
-    tone: Mapped[str] = mapped_column(String(20), default="tragedia", index=True, nullable=False)
-    # Habla de mascotas o animales: se prioriza por ser el tema de la plataforma.
-    is_pet_related: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    # Ciudades detectadas en el titular, separadas por coma.
+    # De qué habla la nota: adopción, albergues, salud, comportamiento o
+    # historias. Sirve para filtrar y para que la portada mezcle temas.
+    topic: Mapped[str] = mapped_column(
+        "tone", String(20), default="historias", index=True, nullable=False
+    )
+    # Es contenido de Colombia. Buena parte de los feeds de mascotas que existen
+    # son españoles, y quien busca una jornada de vacunación necesita distinguir.
+    is_local: Mapped[bool] = mapped_column(
+        "is_pet_related", Boolean, default=False, nullable=False
+    )
+    # Ciudades colombianas detectadas en el texto, separadas por coma.
     cities: Mapped[str | None] = mapped_column(String(300), nullable=True)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
-NEWS_TONES = ("esperanza", "ayuda", "tragedia")
+# El orden es el de la interfaz y también el del turno en la mezcla de la
+# portada: adopción primero porque es lo único que el lector puede accionar hoy
+# mismo, y las historias al final porque son el cajón de lo demás.
+NEWS_TOPICS = ("adopcion", "refugios", "salud", "comportamiento", "historias")
 
-NEWS_TONE_LABELS = {
-    "esperanza": "Esperanza",
-    "ayuda": "Cómo ayudar",
-    "tragedia": "Emergencia",
+NEWS_TOPIC_LABELS = {
+    "adopcion": "Adopción",
+    "refugios": "Albergues y rescate",
+    "salud": "Salud y bienestar",
+    "comportamiento": "Comportamiento",
+    "historias": "Buenas historias",
 }
 
 

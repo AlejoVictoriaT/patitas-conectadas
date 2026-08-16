@@ -142,8 +142,7 @@ export const api = {
 
   // ---- actualidad (notas de medios traídas por RSS)
   news: (params) => request(`/api/news${query(params)}`),
-  newsTones: () => request('/api/news/tones'),
-  newsRegions: () => request('/api/news/regions'),
+  newsTopics: () => request('/api/news/topics'),
 
   // ---- administración
   admin: {

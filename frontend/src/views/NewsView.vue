@@ -1,15 +1,14 @@
 <script setup>
 /**
- * Actualidad: notas de medios externos traídas por RSS.
+ * Noticias del mundo animal: notas de medios externos traídas por RSS.
  *
  * Es contenido ajeno, y la interfaz lo deja claro en todo momento: el nombre
  * del medio siempre visible, el enlace abre fuera del sitio y en ningún caso se
  * reproduce el cuerpo de la nota. Las guías propias viven en otra sección para
  * que nadie confunda quién escribió qué.
  *
- * Se muestran de a pocas y con paginación porque son muchas y ocupan pantalla;
- * además el servidor borra las que pasan de diez días, así que aquí solo hay
- * información que todavía sirve.
+ * El servidor ya descarta lo angustiante y mezcla los temas en la primera
+ * página, así que aquí no hay lógica editorial: solo filtros y presentación.
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -18,11 +17,8 @@ import { timeAgo } from '@/lib/format'
 import { setPageDescription, setPageTitle } from '@/lib/head'
 
 const news = ref([])
-const tones = ref([])
-const regions = ref([])
-const tone = ref('')
-const region = ref('')
-const onlyPets = ref(false)
+const topics = ref([])
+const topic = ref('')
 const loading = ref(true)
 
 const page = ref(1)
@@ -33,25 +29,25 @@ const PAGE_SIZE = 12
 // Ancla para el scroll al cambiar de página.
 const gridRef = ref(null)
 
-const TONE_ICONS = {
-  esperanza: '🌱',
-  ayuda: '🤝',
-  tragedia: '🔴',
+const TOPIC_ICONS = {
+  adopcion: '🏡',
+  refugios: '🤝',
+  salud: '💉',
+  comportamiento: '🧠',
+  historias: '💚',
 }
 
-const hayFiltros = computed(() => Boolean(tone.value || region.value || onlyPets.value))
+const hayFiltros = computed(() => Boolean(topic.value))
 
-function toneLabel(valor) {
-  return tones.value.find((t) => t.value === valor)?.label || valor
+function topicLabel(valor) {
+  return topics.value.find((t) => t.value === valor)?.label || valor
 }
 
 async function loadNews(nuevaPagina = page.value) {
   loading.value = true
   try {
     const data = await api.news({
-      tone: tone.value,
-      region: region.value,
-      only_pets: onlyPets.value,
+      topic: topic.value,
       page: nuevaPagina,
       page_size: PAGE_SIZE,
     })
@@ -82,93 +78,54 @@ async function irAPagina(destino) {
 }
 
 function limpiarFiltros() {
-  tone.value = ''
-  region.value = ''
-  onlyPets.value = false
+  topic.value = ''
 }
 
 onMounted(async () => {
-  setPageTitle('Noticias')
+  setPageTitle('Noticias del mundo animal')
   setPageDescription(
-    'Lo que publican los medios sobre la emergencia en Colombia, con una mezcla equilibrada ' +
-      'entre lo que pasó y lo que se está haciendo para ayudar.',
+    'Jornadas de adopción, albergues, vacunación, comportamiento y buenas historias de perros ' +
+      'y gatos, reunidas de varios medios.',
   )
   try {
-    ;[tones.value, regions.value] = await Promise.all([api.newsTones(), api.newsRegions()])
+    topics.value = await api.newsTopics()
   } catch {
-    tones.value = []
-    regions.value = []
+    topics.value = []
   }
   await loadNews(1)
 })
 
 // Cualquier cambio de filtro vuelve a la primera página: conservar la página 7
-// al cambiar de tono dejaría la pantalla en blanco.
-watch([tone, region, onlyPets], () => loadNews(1))
+// al cambiar de tema dejaría la pantalla en blanco.
+watch(topic, () => loadNews(1))
 </script>
 
 <template>
   <div class="container section">
-    <h1>Noticias</h1>
+    <h1>Noticias del mundo animal</h1>
     <p class="text-soft intro">
-      Titulares de medios de comunicación sobre la emergencia. Procuramos una mezcla: lo que está
-      pasando, pero también lo que se está haciendo para salir adelante.
+      Jornadas de adopción, albergues que necesitan manos, vacunación, comportamiento y buenas
+      historias de perros y gatos. Traemos el titular y el enlace; la nota completa la lees en el
+      medio que la escribió.
     </p>
 
     <!-- Filtros -->
     <div class="panel filters">
       <div class="field">
-        <span class="label">Departamento</span>
+        <span class="label">Tema</span>
         <div class="chip-group">
-          <button type="button" class="chip" :class="{ 'is-selected': !region }" @click="region = ''">
-            Todos
+          <button type="button" class="chip" :class="{ 'is-selected': !topic }" @click="topic = ''">
+            Todo
           </button>
           <button
-            v-for="item in regions"
+            v-for="item in topics"
             :key="item.value"
             type="button"
             class="chip"
-            :class="{ 'is-selected': region === item.value }"
-            :title="`Incluye ${item.capital} y su área`"
-            @click="region = item.value"
+            :class="{ 'is-selected': topic === item.value }"
+            @click="topic = item.value"
           >
-            {{ item.label }}
-          </button>
-        </div>
-      </div>
-
-      <div class="field">
-        <span class="label">Qué quieres leer</span>
-        <div class="chip-group">
-          <button type="button" class="chip" :class="{ 'is-selected': !tone }" @click="tone = ''">
-            Equilibrado
-          </button>
-          <button
-            v-for="item in tones"
-            :key="item.value"
-            type="button"
-            class="chip"
-            :class="{ 'is-selected': tone === item.value }"
-            @click="tone = item.value"
-          >
-            {{ TONE_ICONS[item.value] || '·' }} {{ item.label }}
-          </button>
-
-          <!--
-            Este no es un tono más: es un interruptor que se combina con el tono
-            elegido. Va separado por una línea para que se note que pertenece a
-            otro eje, y `aria-pressed` expone su estado a los lectores de
-            pantalla (los de tono usan `is-selected` a secas).
-          -->
-          <span class="chip-divider" aria-hidden="true"></span>
-          <button
-            type="button"
-            class="chip"
-            :class="{ 'is-selected': onlyPets }"
-            :aria-pressed="onlyPets"
-            @click="onlyPets = !onlyPets"
-          >
-            🐾 Solo mascotas
+            {{ TOPIC_ICONS[item.value] || '·' }} {{ item.label }}
           </button>
         </div>
       </div>
@@ -191,22 +148,27 @@ watch([tone, region, onlyPets], () => loadNews(1))
           v-for="(item, index) in news"
           :key="item.id"
           class="card news-card"
-          :class="`tone-${item.tone}`"
+          :class="`topic-${item.topic}`"
           :style="{ '--i': index }"
           :href="item.url"
           target="_blank"
           rel="noopener noreferrer"
         >
-          <div v-if="item.image_url" class="news-photo">
-            <img :src="item.image_url" :alt="item.title" loading="lazy" decoding="async" />
-          </div>
-
+          <!--
+            Sin foto, a propósito. La mayoría de estas notas llegan por búsqueda
+            temática en toda la prensa, y esa vía no trae imagen de portada:
+            apenas una de cada diez la tiene. Ponerla solo en esas diez hace que
+            las otras noventa parezcan rotas. Sin ninguna, la lista queda pareja,
+            entra más titular en pantalla y carga más rápido. El dato se sigue
+            guardando: si algún día las fuentes traen imagen, es volver a poner
+            este bloque.
+          -->
           <div class="card-body">
             <div class="news-meta">
-              <span class="badge" :class="`badge-tone-${item.tone}`">
-                {{ TONE_ICONS[item.tone] }} {{ toneLabel(item.tone) }}
+              <span class="badge" :class="`badge-topic-${item.topic}`">
+                {{ TOPIC_ICONS[item.topic] }} {{ topicLabel(item.topic) }}
               </span>
-              <span v-if="item.is_pet_related" class="badge badge-neutral">🐾 Mascotas</span>
+              <span v-if="item.cities" class="badge badge-neutral">📍 {{ item.cities }}</span>
             </div>
 
             <h2>{{ item.title }}</h2>
@@ -234,9 +196,9 @@ watch([tone, region, onlyPets], () => loadNews(1))
 
     <EmptyState
       v-else
-      emoji="🗞️"
+      emoji="🐾"
       title="No hay noticias para estos filtros"
-      message="Puede que aún no se haya publicado nada reciente sobre este departamento. Prueba quitando algún filtro."
+      message="Puede que todavía no se haya publicado nada reciente sobre este tema. Prueba quitando algún filtro."
     >
       <button v-if="hayFiltros" class="btn btn-primary" type="button" @click="limpiarFiltros">
         Ver todas las noticias
@@ -245,13 +207,13 @@ watch([tone, region, onlyPets], () => loadNews(1))
 
     <div class="alert alert-info guides-link">
       <div>
-        <strong>¿Buscas qué hacer o a quién llamar?</strong>
+        <strong>¿Buscas algo para hacer hoy?</strong>
         <p class="small">
-          Los teléfonos de emergencia están en la sección Emergencia, y las guías para buscar o
-          cuidar a una mascota, en Guías.
+          Las mascotas que esperan familia están en Adopciones, y las guías para buscar o cuidar a
+          una mascota, en Guías.
         </p>
         <div class="row-tight">
-          <router-link class="btn btn-ghost btn-sm" to="/emergencia">Emergencia</router-link>
+          <router-link class="btn btn-ghost btn-sm" to="/adopciones">Adopciones</router-link>
           <router-link class="btn btn-quiet btn-sm" to="/guias">Guías</router-link>
         </div>
       </div>
@@ -260,12 +222,25 @@ watch([tone, region, onlyPets], () => loadNews(1))
 </template>
 
 <style scoped>
+/*
+  Dos colores propios de esta pantalla. El resto de la paleta sale de los tokens
+  globales, pero «comportamiento» e «historias» no tienen equivalente allí: los
+  tokens de color describen estados de una publicación (perdida, encontrada,
+  adopción), y estos son temas de lectura. Meterlos en el sistema global haría
+  creer que significan lo mismo.
+*/
+.news-grid {
+  --tema-comportamiento: #b45309;
+  --tema-comportamiento-soft: #fdf0dd;
+  --tema-historias: #6d4aa8;
+  --tema-historias-soft: #f1ecfa;
+}
+
 .intro { max-width: 64ch; margin-top: -6px; }
 
 .filters { margin-bottom: 14px; }
 .filters .field:last-of-type { margin-bottom: 0; }
 
-.disclaimer { max-width: 68ch; margin: 0 0 18px; }
 .count { margin: 0 0 12px; }
 
 /* Con 12 tarjetas el paso por defecto haría esperar casi un segundo a la
@@ -277,7 +252,7 @@ watch([tone, region, onlyPets], () => loadNews(1))
   flex-direction: column;
   height: 100%;
   color: var(--text);
-  /* Franja de color por tono: se distingue de un vistazo sin leer la etiqueta. */
+  /* Franja de color por tema: se distingue de un vistazo sin leer la etiqueta. */
   border-left: 4px solid var(--cerrada);
   transition:
     transform var(--dur) var(--ease-out),
@@ -289,13 +264,11 @@ watch([tone, region, onlyPets], () => loadNews(1))
   box-shadow: var(--shadow-lg);
 }
 
-.news-card.tone-esperanza { border-left-color: var(--encontrada); }
-.news-card.tone-ayuda { border-left-color: var(--brand); }
-.news-card.tone-tragedia { border-left-color: var(--perdida); }
-
-.news-photo { aspect-ratio: 16 / 9; overflow: hidden; background: var(--surface-2); }
-.news-photo img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s var(--ease-out); }
-.news-card:hover .news-photo img { transform: scale(1.05); }
+.news-card.topic-adopcion { border-left-color: var(--adopcion); }
+.news-card.topic-refugios { border-left-color: var(--brand); }
+.news-card.topic-salud { border-left-color: var(--encontrada); }
+.news-card.topic-comportamiento { border-left-color: var(--tema-comportamiento); }
+.news-card.topic-historias { border-left-color: var(--tema-historias); }
 
 .news-card .card-body { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .news-meta { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -314,20 +287,19 @@ watch([tone, region, onlyPets], () => loadNews(1))
 .source-line { margin: auto 0 0; padding-top: 4px; }
 .external { opacity: 0.6; }
 
-.badge-tone-esperanza { background: var(--encontrada-soft); color: #027a48; }
-.badge-tone-ayuda { background: var(--brand-light); color: var(--brand-dark); }
-.badge-tone-tragedia { background: var(--perdida-soft); color: #b42318; }
+.badge-topic-adopcion { background: var(--adopcion-soft); color: #175cd3; }
+.badge-topic-refugios { background: var(--brand-light); color: var(--brand-dark); }
+.badge-topic-salud { background: var(--encontrada-soft); color: #027a48; }
+.badge-topic-comportamiento {
+  background: var(--tema-comportamiento-soft);
+  color: var(--tema-comportamiento);
+}
+.badge-topic-historias {
+  background: var(--tema-historias-soft);
+  color: var(--tema-historias);
+}
 
 .clear { margin-top: 4px; }
-
-/* Separa los chips de tono (selección única) del interruptor de mascotas. */
-.chip-divider {
-  align-self: center;
-  width: 1px;
-  height: 24px;
-  margin-inline: 4px;
-  background: var(--border-strong);
-}
 
 .pager {
   display: flex;
@@ -342,7 +314,8 @@ watch([tone, region, onlyPets], () => loadNews(1))
 
 @media (min-width: 768px) {
   .news-grid { grid-template-columns: repeat(2, 1fr); }
-  .filters { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 0 24px; align-items: start; }
+  /* Antes eran dos columnas porque había dos filtros, tema y departamento. Con
+     uno solo, esa rejilla lo encogía a 320px y partía los chips en tres filas. */
 }
 
 @media (min-width: 1024px) {

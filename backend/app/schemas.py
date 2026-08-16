@@ -340,8 +340,8 @@ class NewsItemOut(BaseModel):
     url: str
     image_url: str | None
     source: str
-    tone: str
-    is_pet_related: bool
+    topic: str
+    is_local: bool
     cities: str | None
     published_at: datetime
 
